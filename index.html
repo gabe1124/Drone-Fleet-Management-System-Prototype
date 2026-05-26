@@ -363,9 +363,16 @@ function enforceRBAC() {
     const el = document.getElementById('nav-'+p);
     if (el) el.style.display = allowed.includes(p) ? 'flex' : 'none';
   });
+  // Hide the "Security" section header if none of its pages are accessible
+  const securityPages = ['auditlog','sessions','alerts','users'];
+  const hasSecAccess = securityPages.some(p => allowed.includes(p));
+  document.querySelectorAll('.nav-section').forEach(el => {
+    if (el.textContent.trim() === 'Security') el.style.display = hasSecAccess ? '' : 'none';
+  });
 }
 
 function doLogout() {
+  clearInterval(mfaInterval);
   logAudit('System', ROLES[currentRole].name, 'User logged out — session terminated', '10.20.1.12', 'Low');
   document.getElementById('app').style.display='none';
   document.getElementById('auth-screen').style.display='flex';
@@ -394,7 +401,7 @@ function batBadge(v) {
   return `<div class="bat-bar"><div class="bat-fill" style="width:${v}%;background:${batColor(v)}"></div></div>${v}%`;
 }
 function statusBadge(s) {
-  const map = {'Flight In-Progress':'badge-blue','Charging':'badge-yellow','Docked':'badge-green','Offline':'badge-red','Active':'badge-blue','Pending':'badge-yellow','Resolved':'badge-green','Open':'badge-red','In Progress':'badge-yellow','Approved':'badge-green','Critical':'badge-red','High':'badge-red','Medium':'badge-yellow','Low':'badge-green'};
+  const map = {'Flight In-Progress':'badge-blue','Charging':'badge-yellow','Docked':'badge-green','Offline':'badge-red','Active':'badge-blue','Pending':'badge-yellow','Resolved':'badge-green','Open':'badge-red','In Progress':'badge-yellow','Approved':'badge-green','Critical':'badge-red','High':'badge-red','Medium':'badge-yellow','Low':'badge-green','Operational':'badge-green','Questionable':'badge-yellow'};
   return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`;
 }
 function shortToken(t) { return t.substring(0,32)+'…'; }
@@ -411,8 +418,6 @@ function now() {
 // ==================== PAGES ====================
 function renderDashboard() {
   const flying = drones.filter(d=>d.status==='Flight In-Progress').length;
-  const charging = drones.filter(d=>d.status==='Charging').length;
-  const offline = drones.filter(d=>d.status==='Offline').length;
   const unackAlerts = alerts.filter(a=>!a.ack).length;
   const openTkts = tickets.filter(t=>t.status==='Open').length;
   return `
