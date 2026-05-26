@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DFMS — WindTech Innovations</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Roboto,sans-serif;background:#f5f5f5;color:#212121}
+  /* Auth screens */
+  #auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#1565c0 0%,#0d47a1 100%)}
+  .auth-card{background:#fff;border-radius:8px;padding:40px;width:380px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  .auth-card h1{font-size:20px;font-weight:600;color:#1565c0;margin-bottom:4px}
+  .auth-card p.sub{font-size:13px;color:#757575;margin-bottom:28px}
+  .auth-card label{display:block;font-size:12px;font-weight:600;color:#616161;margin-bottom:4px;margin-top:16px}
+  .auth-card input,.auth-card select{width:100%;border:1px solid #ccc;border-radius:4px;padding:10px 12px;font-size:14px;outline:none;transition:border .2s}
+  .auth-card input:focus,.auth-card select:focus{border-color:#1565c0}
+  .btn-primary{display:block;width:100%;background:#1565c0;color:#fff;border:none;border-radius:4px;padding:12px;font-size:14px;font-weight:600;cursor:pointer;margin-top:24px;transition:background .2s}
+  .btn-primary:hover{background:#0d47a1}
+  .mfa-digits{display:flex;gap:8px;justify-content:center;margin:16px 0}
+  .mfa-digits input{width:44px;height:52px;text-align:center;font-size:22px;font-weight:700;border:2px solid #ccc;border-radius:4px}
+  .mfa-digits input:focus{border-color:#1565c0;outline:none}
+  .auth-badge{background:#e8f5e9;border-radius:4px;padding:8px 12px;font-size:12px;color:#2e7d32;margin-top:12px;display:flex;align-items:center;gap:6px}
+  .auth-err{background:#ffebee;border-radius:4px;padding:8px 12px;font-size:12px;color:#c62828;margin-top:12px;display:none}
+  /* App shell */
+  #app{display:none;flex-direction:column;height:100vh}
+  .topbar{background:#1565c0;color:#fff;padding:0 20px;height:56px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 4px rgba(0,0,0,.3);position:fixed;top:0;left:0;right:0;z-index:100}
+  .topbar .logo{font-size:17px;font-weight:700;flex:1}
+  .topbar .logo span{font-weight:300;opacity:.8}
+  .topbar-meta{font-size:12px;display:flex;align-items:center;gap:16px}
+  .tls-badge{background:rgba(255,255,255,.15);border-radius:12px;padding:3px 10px;font-size:11px;display:flex;align-items:center;gap:4px}
+  .tls-badge::before{content:'🔒';font-size:11px}
+  .user-chip{display:flex;align-items:center;gap:8px;cursor:pointer}
+  .avatar{width:32px;height:32px;border-radius:50%;background:#90caf9;color:#0d47a1;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
+  .layout{display:flex;margin-top:56px;height:calc(100vh - 56px)}
+  .sidebar{width:220px;background:#fff;border-right:1px solid #e0e0e0;display:flex;flex-direction:column;padding:12px 0;flex-shrink:0;overflow-y:auto}
+  .nav-section{padding:8px 16px 4px;font-size:11px;font-weight:700;color:#9e9e9e;letter-spacing:.6px;text-transform:uppercase}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;cursor:pointer;font-size:14px;color:#424242;transition:background .15s;border-left:3px solid transparent}
+  .nav-item:hover{background:#e3f2fd}
+  .nav-item.active{background:#e3f2fd;color:#1565c0;font-weight:600;border-left-color:#1565c0}
+  .nav-icon{font-size:17px;width:20px;text-align:center}
+  .main{flex:1;overflow-y:auto;padding:24px}
+  /* Cards & layout */
+  .page-title{font-size:22px;font-weight:600;color:#212121;margin-bottom:20px}
+  .stats-row{display:grid;gap:16px;margin-bottom:20px}
+  .stats-row.cols-4{grid-template-columns:repeat(4,1fr)}
+  .stats-row.cols-3{grid-template-columns:repeat(3,1fr)}
+  .stat-card{background:#fff;border-radius:6px;padding:18px 20px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  .stat-card .val{font-size:30px;font-weight:700;color:#1565c0;margin-bottom:2px}
+  .stat-card .lbl{font-size:12px;color:#757575}
+  .stat-card .chg{font-size:11px;margin-top:4px}
+  .chg.up{color:#2e7d32} .chg.down{color:#c62828} .chg.warn{color:#e65100}
+  .card{background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.1);margin-bottom:20px}
+  .card-header{padding:16px 20px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between}
+  .card-title{font-size:15px;font-weight:600;color:#212121}
+  .card-body{padding:0}
+  /* Badges */
+  .badge{display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;font-weight:600;text-transform:uppercase}
+  .badge-green{background:#e8f5e9;color:#2e7d32}
+  .badge-red{background:#ffebee;color:#c62828}
+  .badge-yellow{background:#fff8e1;color:#e65100}
+  .badge-blue{background:#e3f2fd;color:#1565c0}
+  .badge-gray{background:#f5f5f5;color:#616161}
+  .badge-purple{background:#f3e5f5;color:#6a1b9a}
+  /* Tables */
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;padding:10px 16px;font-size:11px;font-weight:700;color:#9e9e9e;text-transform:uppercase;letter-spacing:.4px;background:#fafafa;border-bottom:1px solid #e0e0e0}
+  td{padding:11px 16px;font-size:13px;color:#424242;border-bottom:1px solid #f0f0f0}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fafafa}
+  .mono{font-family:'Courier New',monospace;font-size:12px}
+  /* Battery bar */
+  .bat-bar{width:60px;height:8px;background:#e0e0e0;border-radius:4px;display:inline-block;vertical-align:middle;margin-right:6px}
+  .bat-fill{height:100%;border-radius:4px}
+  /* Alerts */
+  .alert-item{display:flex;align-items:flex-start;gap:12px;padding:12px 20px;border-bottom:1px solid #f0f0f0}
+  .alert-item:last-child{border-bottom:none}
+  .alert-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+  .dot-red{background:#f44336} .dot-yellow{background:#ff9800} .dot-blue{background:#2196f3}
+  .alert-body{flex:1}
+  .alert-title{font-size:13px;font-weight:600;color:#212121}
+  .alert-meta{font-size:11px;color:#9e9e9e;margin-top:2px}
+  /* Forms */
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px}
+  .form-field{display:flex;flex-direction:column;gap:6px}
+  .form-field.full{grid-column:1/-1}
+  .form-field label{font-size:12px;font-weight:600;color:#616161}
+  .form-field input,.form-field select,.form-field textarea{border:1px solid #ddd;border-radius:4px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;transition:border .2s}
+  .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:#1565c0}
+  .form-actions{padding:12px 20px;border-top:1px solid #f0f0f0;display:flex;gap:10px;justify-content:flex-end}
+  .btn{padding:9px 18px;border-radius:4px;font-size:13px;font-weight:600;cursor:pointer;border:none}
+  .btn-sm{padding:5px 12px;font-size:12px}
+  .btn-blue{background:#1565c0;color:#fff} .btn-blue:hover{background:#0d47a1}
+  .btn-outline{background:#fff;color:#1565c0;border:1px solid #1565c0} .btn-outline:hover{background:#e3f2fd}
+  .btn-red{background:#c62828;color:#fff} .btn-red:hover{background:#b71c1c}
+  /* Modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center}
+  .modal{background:#fff;border-radius:8px;width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.3)}
+  .modal-head{padding:20px 24px;border-bottom:1px solid #f0f0f0;display:flex;justify-content:space-between;align-items:center}
+  .modal-head h3{font-size:16px;font-weight:600}
+  .modal-close{cursor:pointer;font-size:20px;color:#9e9e9e;line-height:1}
+  /* Security-specific */
+  .enc-indicator{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#2e7d32;font-weight:600}
+  .enc-indicator::before{content:'🔐'}
+  .risk-high{color:#c62828;font-weight:600}
+  .risk-med{color:#e65100;font-weight:600}
+  .risk-low{color:#2e7d32;font-weight:600}
+  .session-row td:first-child{font-family:'Courier New',monospace;font-size:11px}
+  /* Sidebar bottom */
+  .sidebar-spacer{flex:1}
+  .sidebar-logout{padding:12px 20px;border-top:1px solid #f0f0f0;cursor:pointer;font-size:13px;color:#c62828;display:flex;align-items:center;gap:8px}
+  .sidebar-logout:hover{background:#ffebee}
+  /* Interlock banner */
+  .interlock-banner{background:#fff3e0;border:1px solid #ffb300;border-radius:6px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#e65100}
+  /* Misc */
+  .empty{padding:40px;text-align:center;color:#bdbdbd;font-size:14px}
+  .chip{display:inline-block;background:#e3f2fd;color:#1565c0;border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600}
+  .role-tag{display:inline-block;background:#ede7f6;color:#4527a0;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600}
+  .divider{height:1px;background:#f0f0f0;margin:8px 0}
+</style>
+</head>
+<body>
+
+<!-- ==================== LOGIN SCREEN ==================== -->
+<div id="auth-screen">
+  <div class="auth-card" id="login-panel">
+    <h1>WindTech DFMS</h1>
+    <p class="sub">Drone Fleet Management System &mdash; Sign in to continue</p>
+    <label>Role / Account</label>
+    <select id="login-role">
+      <option value="ops">Operations Manager &mdash; Sarah Chen</option>
+      <option value="cso">Chief Security Officer &mdash; Anna Kowalski</option>
+      <option value="tech">Maintenance Technician &mdash; Marcus Reid</option>
+      <option value="safety">Safety Officer &mdash; Alex Johnson</option>
+      <option value="analyst">IT / Data Analyst &mdash; Jordan Lee</option>
+    </select>
+    <label>Password</label>
+    <input type="password" id="login-pw" placeholder="••••••••" value="Demo1234!">
+    <div class="auth-err" id="login-err">Invalid credentials. Please try again.</div>
+    <button class="btn-primary" onclick="doLogin()">Sign In</button>
+    <div class="auth-badge">🔒 TLS 1.3 encrypted &nbsp;|&nbsp; Microsoft AD SSO</div>
+  </div>
+
+  <div class="auth-card" id="mfa-panel" style="display:none">
+    <h1>Two-Factor Authentication</h1>
+    <p class="sub">Enter the 6-digit code from your authenticator app</p>
+    <div class="mfa-digits">
+      <input type="text" maxlength="1" class="mfa-d" oninput="mfaNext(this,0)">
+      <input type="text" maxlength="1" class="mfa-d" oninput="mfaNext(this,1)">
+      <input type="text" maxlength="1" class="mfa-d" oninput="mfaNext(this,2)">
+      <input type="text" maxlength="1" class="mfa-d" oninput="mfaNext(this,3)">
+      <input type="text" maxlength="1" class="mfa-d" oninput="mfaNext(this,4)">
+      <input type="text" maxlength="1" class="mfa-d" oninput="mfaNext(this,5)">
+    </div>
+    <div class="auth-err" id="mfa-err">Invalid code. Please try again.</div>
+    <button class="btn-primary" onclick="doMFA()">Verify</button>
+    <div class="auth-badge">📱 TOTP &nbsp;|&nbsp; Code expires in <span id="mfa-timer">30</span>s</div>
+  </div>
+</div>
+
+<!-- ==================== MAIN APP ==================== -->
+<div id="app">
+  <div class="topbar">
+    <div class="logo">WindTech <span>DFMS</span></div>
+    <div class="topbar-meta">
+      <div class="tls-badge">TLS 1.3 &nbsp; AES-256</div>
+      <span style="font-size:12px;opacity:.8" id="top-site">NL-Farm-7</span>
+      <div class="user-chip">
+        <div class="avatar" id="top-avatar">SC</div>
+        <span style="font-size:13px" id="top-user">Sarah Chen</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="sidebar">
+      <div style="padding:12px 20px 8px;font-size:12px;color:#9e9e9e">
+        <span id="sb-role-tag" class="role-tag">Operations Manager</span>
+      </div>
+      <div class="divider"></div>
+      <div class="nav-section">Operations</div>
+      <div class="nav-item active" onclick="setPage('dashboard')" id="nav-dashboard">
+        <span class="nav-icon">📊</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="setPage('fleet')" id="nav-fleet">
+        <span class="nav-icon">🚁</span> Drone Fleet
+      </div>
+      <div class="nav-item" onclick="setPage('scheduling')" id="nav-scheduling">
+        <span class="nav-icon">📅</span> Scheduling
+      </div>
+      <div class="nav-item" onclick="setPage('tickets')" id="nav-tickets">
+        <span class="nav-icon">🎫</span> Tickets
+      </div>
+      <div class="nav-item" onclick="setPage('reports')" id="nav-reports">
+        <span class="nav-icon">📈</span> Reports
+      </div>
+      <div class="nav-section">Security</div>
+      <div class="nav-item" onclick="setPage('auditlog')" id="nav-auditlog">
+        <span class="nav-icon">📋</span> Audit Log
+      </div>
+      <div class="nav-item" onclick="setPage('sessions')" id="nav-sessions">
+        <span class="nav-icon">🖥</span> Sessions
+      </div>
+      <div class="nav-item" onclick="setPage('alerts')" id="nav-alerts">
+        <span class="nav-icon">🔔</span> Alerts <span id="alert-count-badge" style="background:#f44336;color:#fff;border-radius:10px;font-size:10px;padding:1px 6px;margin-left:4px">3</span>
+      </div>
+      <div class="nav-item" onclick="setPage('users')" id="nav-users">
+        <span class="nav-icon">👥</span> User Management
+      </div>
+      <div class="sidebar-spacer"></div>
+      <div class="sidebar-logout" onclick="doLogout()">⬅ Sign Out</div>
+    </div>
+
+    <div class="main" id="main-content"></div>
+  </div>
+</div>
+
+<!-- Modal container -->
+<div id="modal-bg" class="modal-bg" style="display:none" onclick="closeModal(event)">
+  <div class="modal" id="modal-box"></div>
+</div>
+
+<script>
+// ==================== STATE ====================
+const ROLES = {
+  ops:     {name:'Sarah Chen',   title:'Operations Manager',       initials:'SC', site:'NL-Farm-7', pages:['dashboard','fleet','scheduling','tickets','reports','auditlog','sessions','alerts','users']},
+  cso:     {name:'Anna Kowalski',title:'Chief Security Officer',   initials:'AK', site:'HQ-Amsterdam', pages:['dashboard','auditlog','sessions','alerts','users','reports']},
+  tech:    {name:'Marcus Reid',  title:'Maintenance Technician',   initials:'MR', site:'NL-Farm-7', pages:['dashboard','fleet','tickets']},
+  safety:  {name:'Alex Johnson', title:'Safety Officer',           initials:'AJ', site:'NL-Farm-7', pages:['dashboard','scheduling','tickets','auditlog']},
+  analyst: {name:'Jordan Lee',   title:'IT / Data Analyst',        initials:'JL', site:'HQ-Amsterdam', pages:['dashboard','fleet','reports','auditlog']},
+};
+
+let currentRole = 'ops';
+let currentPage = 'dashboard';
+let mfaInterval;
+let mfaTime = 30;
+
+// ==================== SAMPLE DATA ====================
+const drones = [
+  {id:'WND-2401-001-1001', model:'DJI Matrice 350', site:'NL-Farm-7',   turbine:'NLF-7001-003', status:'Flight In-Progress', battery:72, pilot:'Marcus Reid',   lat:52.3706, enc:true},
+  {id:'WND-2401-001-1002', model:'DJI Matrice 350', site:'NL-Farm-7',   turbine:'NLF-7001-007', status:'Charging',          battery:48, pilot:'—',             lat:52.3706, enc:true},
+  {id:'WND-2401-002-2001', model:'Skydio X10D',     site:'DE-Offshore-2',turbine:'DEO-2002-011', status:'Docked',            battery:95, pilot:'—',             lat:54.5268, enc:true},
+  {id:'WND-2401-002-2002', model:'Skydio X10D',     site:'DE-Offshore-2',turbine:'—',            status:'Offline',           battery:12, pilot:'—',             lat:54.5268, enc:false},
+  {id:'WND-2401-003-3001', model:'Autel EVO II',    site:'DK-Wind-1',   turbine:'DKW-1003-002', status:'Flight In-Progress', battery:61, pilot:'Emma Johansson',lat:55.4038, enc:true},
+  {id:'WND-2401-003-3002', model:'Autel EVO II',    site:'DK-Wind-1',   turbine:'—',            status:'Charging',          battery:34, pilot:'—',             lat:55.4038, enc:true},
+  {id:'WND-2401-004-4001', model:'DJI Matrice 350', site:'UK-Coast-3',  turbine:'UKC-3004-005', status:'Docked',            battery:88, pilot:'—',             lat:51.5074, enc:true},
+  {id:'WND-2401-004-4002', model:'DJI Matrice 350', site:'UK-Coast-3',  turbine:'—',            status:'Offline',           battery:5,  pilot:'—',             lat:51.5074, enc:false},
+  {id:'WND-2401-004-4003', model:'Skydio X10D',     site:'UK-Coast-3',  turbine:'UKC-3004-009', status:'Flight In-Progress', battery:55, pilot:'Tom Briggs',    lat:51.5074, enc:true},
+];
+
+const tickets = [
+  {id:'TKT-001', title:'Battery threshold alert — WND-2401-004-4002', drone:'WND-2401-004-4002', type:'Maintenance', priority:'High',   status:'Open',     created:'2026-05-25', assignee:'Marcus Reid'},
+  {id:'TKT-002', title:'Unencrypted link detected — WND-2401-002-2002',drone:'WND-2401-002-2002',type:'Security',    priority:'Critical',status:'Open',    created:'2026-05-25', assignee:'Anna Kowalski'},
+  {id:'TKT-003', title:'Routine inspection — NLF-7001-003',           drone:'WND-2401-001-1001', type:'Inspection',  priority:'Low',    status:'In Progress',created:'2026-05-24', assignee:'Marcus Reid'},
+  {id:'TKT-004', title:'WhatsApp comms violation flagged',             drone:'—',                 type:'Compliance',  priority:'High',   status:'Open',     created:'2026-05-23', assignee:'Anna Kowalski'},
+  {id:'TKT-005', title:'Firmware update required — Skydio fleet',      drone:'WND-2401-003-3001', type:'Maintenance', priority:'Medium', status:'Resolved', created:'2026-05-22', assignee:'Marcus Reid'},
+  {id:'TKT-006', title:'Pre-flight interlock bypass attempt',           drone:'WND-2401-001-1002', type:'Security',    priority:'Critical',status:'Open',    created:'2026-05-26', assignee:'Anna Kowalski'},
+];
+
+const schedules = [
+  {id:'SCH-001', drone:'WND-2401-001-1001', turbine:'NLF-7001-003', site:'NL-Farm-7',    type:'Routine',   pilot:'Marcus Reid',   date:'2026-05-26', time:'08:00', status:'Active',    auth:'Approved', groundCrew:false},
+  {id:'SCH-002', drone:'WND-2401-003-3001', turbine:'DKW-1003-002', site:'DK-Wind-1',    type:'Emergency', pilot:'Emma Johansson', date:'2026-05-26', time:'09:30', status:'Active',    auth:'Approved', groundCrew:false},
+  {id:'SCH-003', drone:'WND-2401-004-4003', turbine:'UKC-3004-005', site:'UK-Coast-3',   type:'Routine',   pilot:'Tom Briggs',    date:'2026-05-26', time:'10:00', status:'Active',    auth:'Approved', groundCrew:false},
+  {id:'SCH-004', drone:'WND-2401-002-2001', turbine:'DEO-2002-011', site:'DE-Offshore-2',type:'Training',  pilot:'Lars Müller',   date:'2026-05-27', time:'07:30', status:'Pending',   auth:'Pending',  groundCrew:true},
+  {id:'SCH-005', drone:'WND-2401-001-1002', turbine:'NLF-7001-007', site:'NL-Farm-7',    type:'Routine',   pilot:'Marcus Reid',   date:'2026-05-27', time:'13:00', status:'Pending',   auth:'Pending',  groundCrew:false},
+];
+
+const auditLog = [
+  {id:'a1b2c3d4-e5f6-7890-abcd-ef1234567890', ts:'2026-05-26 09:47:11', type:'Security',   user:'Anna Kowalski', action:'Unencrypted drone link detected',               ip:'10.20.1.44',  risk:'High'},
+  {id:'b2c3d4e5-f6a7-8901-bcde-f12345678901', ts:'2026-05-26 09:31:02', type:'System',     user:'Sarah Chen',    action:'User login — MFA verified',                      ip:'10.20.1.12',  risk:'Low'},
+  {id:'c3d4e5f6-a7b8-9012-cdef-123456789012', ts:'2026-05-26 09:05:44', type:'Compliance', user:'System',        action:'WhatsApp comms flagged — non-secure channel',     ip:'—',           risk:'High'},
+  {id:'d4e5f6a7-b8c9-0123-defa-234567890123', ts:'2026-05-26 08:58:17', type:'Security',   user:'System',        action:'Pre-flight interlock bypass attempt — WND-2401-001-1002', ip:'10.20.1.33', risk:'Critical'},
+  {id:'e5f6a7b8-c9d0-1234-efab-345678901234', ts:'2026-05-26 08:30:00', type:'Telemetry',  user:'System',        action:'Telemetry latency >15s — WND-2401-002-2002',      ip:'—',           risk:'Medium'},
+  {id:'f6a7b8c9-d0e1-2345-fabc-456789012345', ts:'2026-05-25 17:22:09', type:'Compliance', user:'Alex Johnson',  action:'Flight log submitted — SCH-003',                  ip:'10.20.1.19',  risk:'Low'},
+  {id:'a7b8c9d0-e1f2-3456-abcd-567890123456', ts:'2026-05-25 16:55:33', type:'System',     user:'Jordan Lee',    action:'Data export — drone_telemetry_2026-05-25.csv',    ip:'10.20.1.81',  risk:'Low'},
+  {id:'b8c9d0e1-f2a3-4567-bcde-678901234567', ts:'2026-05-25 14:10:21', type:'Security',   user:'System',        action:'Failed login — 3 attempts from 192.168.5.77',     ip:'192.168.5.77',risk:'High'},
+];
+
+const sessions = [
+  {token:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiU0MiLCJpYXQiOjE3MTk5MDAwMDB9.demoToken1', user:'Sarah Chen',    role:'Operations Manager', ip:'10.20.1.12', started:'09:31', expires:'11:31', site:'NL-Farm-7',    active:true},
+  {token:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiQUsiLCJpYXQiOjE3MTk5MDAxMDB9.demoToken2', user:'Anna Kowalski', role:'CSO',                ip:'10.20.1.44', started:'09:15', expires:'11:15', site:'HQ-Amsterdam', active:true},
+  {token:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiTVIiLCJpYXQiOjE3MTk5MDAyMDB9.demoToken3', user:'Marcus Reid',   role:'Maint. Technician',  ip:'10.20.1.33', started:'08:00', expires:'10:00', site:'NL-Farm-7',    active:true},
+  {token:'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiRUoiLCJpYXQiOjE3MTk5MDAzMDB9.demoToken4', user:'Emma Johansson', role:'Drone Operator',    ip:'10.21.3.99', started:'07:50', expires:'09:50', site:'DK-Wind-1',    active:true},
+];
+
+const alerts = [
+  {id:1, sev:'Critical', title:'Pre-flight interlock bypass attempt',     detail:'WND-2401-001-1002 — unauthorized flight command issued while ground crew active on NLF-7001-007', ts:'09:05', ack:false},
+  {id:2, sev:'High',     title:'Unencrypted telemetry link',               detail:'WND-2401-002-2002 at DE-Offshore-2 — TLS handshake failed, data transmitted in cleartext',         ts:'08:58', ack:false},
+  {id:3, sev:'High',     title:'Non-compliant communication channel',      detail:'WhatsApp used for mission coordination — violates secure comms policy SEC-007',                    ts:'09:05', ack:false},
+  {id:4, sev:'Medium',   title:'Telemetry latency exceeded threshold',     detail:'WND-2401-002-2002 — 15.4s average latency (threshold: <2s)',                                       ts:'08:30', ack:true},
+  {id:5, sev:'Medium',   title:'Low battery — aircraft grounding risk',    detail:'WND-2401-004-4002 battery at 5% — automatic grounding initiated',                                  ts:'07:55', ack:true},
+  {id:6, sev:'Low',      title:'Firmware version mismatch',                detail:'Skydio X10D units running v3.1.2 — current approved version v3.2.0',                               ts:'2026-05-25', ack:true},
+];
+
+const users = [
+  {id:'EMP-000123', name:'Sarah Chen',    role:'ops',    title:'Operations Manager',     site:'NL-Farm-7',    status:'Active', mfa:true,  lastLogin:'2026-05-26 09:31'},
+  {id:'EMP-000456', name:'Anna Kowalski', role:'cso',    title:'Chief Security Officer', site:'HQ-Amsterdam', status:'Active', mfa:true,  lastLogin:'2026-05-26 09:15'},
+  {id:'EMP-000789', name:'Marcus Reid',   role:'tech',   title:'Maintenance Technician', site:'NL-Farm-7',    status:'Active', mfa:true,  lastLogin:'2026-05-26 08:00'},
+  {id:'EMP-001012', name:'Alex Johnson',  role:'safety', title:'Safety Officer',         site:'NL-Farm-7',    status:'Active', mfa:true,  lastLogin:'2026-05-25 14:30'},
+  {id:'EMP-001345', name:'Jordan Lee',    role:'analyst',title:'IT / Data Analyst',      site:'HQ-Amsterdam', status:'Active', mfa:false, lastLogin:'2026-05-25 16:55'},
+  {id:'EMP-001678', name:'Emma Johansson',role:'tech',   title:'Drone Operator',         site:'DK-Wind-1',    status:'Active', mfa:true,  lastLogin:'2026-05-26 07:50'},
+  {id:'EMP-001900', name:'Lars Müller',   role:'tech',   title:'Drone Operator',         site:'DE-Offshore-2',status:'Active', mfa:true,  lastLogin:'2026-05-24 09:00'},
+  {id:'EMP-002100', name:'Tom Briggs',    role:'tech',   title:'Drone Operator',         site:'UK-Coast-3',   status:'Active', mfa:true,  lastLogin:'2026-05-26 10:00'},
+];
+
+// ==================== AUTH ====================
+function doLogin() {
+  const pw = document.getElementById('login-pw').value;
+  const err = document.getElementById('login-err');
+  if (!pw || pw.length < 6) { err.style.display='block'; return; }
+  err.style.display='none';
+  currentRole = document.getElementById('login-role').value;
+  logAudit('System', ROLES[currentRole].name, 'Login attempt — MFA challenge issued', ROLES[currentRole].site === 'HQ-Amsterdam' ? '10.20.1.44' : '10.20.1.12', 'Low');
+  document.getElementById('login-panel').style.display='none';
+  document.getElementById('mfa-panel').style.display='block';
+  startMFATimer();
+}
+
+function startMFATimer() {
+  mfaTime = 30;
+  clearInterval(mfaInterval);
+  mfaInterval = setInterval(() => {
+    mfaTime--;
+    const el = document.getElementById('mfa-timer');
+    if (el) el.textContent = mfaTime;
+    if (mfaTime <= 0) { clearInterval(mfaInterval); mfaTime = 30; }
+  }, 1000);
+}
+
+function mfaNext(el, idx) {
+  const digits = document.querySelectorAll('.mfa-d');
+  if (el.value && idx < 5) digits[idx+1].focus();
+  const code = Array.from(digits).map(d=>d.value).join('');
+  if (code.length === 6) doMFA();
+}
+
+function doMFA() {
+  const digits = document.querySelectorAll('.mfa-d');
+  const code = Array.from(digits).map(d=>d.value).join('');
+  // Demo: any 6-digit code passes
+  if (code.length < 6) { document.getElementById('mfa-err').style.display='block'; return; }
+  clearInterval(mfaInterval);
+  document.getElementById('mfa-err').style.display='none';
+  launchApp();
+}
+
+function launchApp() {
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  const r = ROLES[currentRole];
+  document.getElementById('top-user').textContent = r.name;
+  document.getElementById('top-avatar').textContent = r.initials;
+  document.getElementById('top-site').textContent = r.site;
+  document.getElementById('sb-role-tag').textContent = r.title;
+  enforceRBAC();
+  logAudit('System', r.name, 'User login — MFA verified', '10.20.1.12', 'Low');
+  setPage('dashboard');
+}
+
+function enforceRBAC() {
+  const allowed = ROLES[currentRole].pages;
+  ['dashboard','fleet','scheduling','tickets','reports','auditlog','sessions','alerts','users'].forEach(p => {
+    const el = document.getElementById('nav-'+p);
+    if (el) el.style.display = allowed.includes(p) ? 'flex' : 'none';
+  });
+}
+
+function doLogout() {
+  logAudit('System', ROLES[currentRole].name, 'User logged out — session terminated', '10.20.1.12', 'Low');
+  document.getElementById('app').style.display='none';
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('login-panel').style.display='block';
+  document.getElementById('mfa-panel').style.display='none';
+  document.querySelectorAll('.mfa-d').forEach(d=>d.value='');
+}
+
+// ==================== NAVIGATION ====================
+function setPage(p) {
+  const allowed = ROLES[currentRole].pages;
+  if (!allowed.includes(p)) { alert('Access denied: your role does not have permission to view this page.'); return; }
+  currentPage = p;
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  const nav = document.getElementById('nav-'+p);
+  if (nav) nav.classList.add('active');
+  const pages = {dashboard:renderDashboard, fleet:renderFleet, scheduling:renderScheduling,
+                 tickets:renderTickets, reports:renderReports, auditlog:renderAuditLog,
+                 sessions:renderSessions, alerts:renderAlerts, users:renderUsers};
+  if (pages[p]) document.getElementById('main-content').innerHTML = pages[p]();
+}
+
+// ==================== HELPERS ====================
+function batColor(v) { return v >= 60 ? '#4caf50' : v >= 30 ? '#ff9800' : '#f44336'; }
+function batBadge(v) {
+  return `<div class="bat-bar"><div class="bat-fill" style="width:${v}%;background:${batColor(v)}"></div></div>${v}%`;
+}
+function statusBadge(s) {
+  const map = {'Flight In-Progress':'badge-blue','Charging':'badge-yellow','Docked':'badge-green','Offline':'badge-red','Active':'badge-blue','Pending':'badge-yellow','Resolved':'badge-green','Open':'badge-red','In Progress':'badge-yellow','Approved':'badge-green','Critical':'badge-red','High':'badge-red','Medium':'badge-yellow','Low':'badge-green'};
+  return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`;
+}
+function shortToken(t) { return t.substring(0,32)+'…'; }
+function logAudit(type, user, action, ip, risk) {
+  auditLog.unshift({id:uuid(), ts:now(), type, user, action, ip, risk});
+}
+function uuid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16)});
+}
+function now() {
+  return new Date().toISOString().replace('T',' ').substring(0,19);
+}
+
+// ==================== PAGES ====================
+function renderDashboard() {
+  const flying = drones.filter(d=>d.status==='Flight In-Progress').length;
+  const charging = drones.filter(d=>d.status==='Charging').length;
+  const offline = drones.filter(d=>d.status==='Offline').length;
+  const unackAlerts = alerts.filter(a=>!a.ack).length;
+  const openTkts = tickets.filter(t=>t.status==='Open').length;
+  return `
+  <div class="page-title">Dashboard</div>
+  <div class="stats-row cols-4">
+    <div class="stat-card"><div class="val">${drones.length}</div><div class="lbl">Total Drones</div><div class="chg up">↑ 4 sites active</div></div>
+    <div class="stat-card"><div class="val" style="color:#1565c0">${flying}</div><div class="lbl">In Flight</div><div class="chg">Right now</div></div>
+    <div class="stat-card"><div class="val" style="color:#e65100">${unackAlerts}</div><div class="lbl">Unacknowledged Alerts</div><div class="chg warn">⚠ Action required</div></div>
+    <div class="stat-card"><div class="val" style="color:#c62828">${openTkts}</div><div class="lbl">Open Tickets</div><div class="chg down">2 Critical</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Fleet Status by Site</span><span class="enc-indicator">Encrypted Telemetry</span></div>
+      <div class="card-body">
+        <table>
+          <tr><th>Site</th><th>Flying</th><th>Charging</th><th>Docked</th><th>Offline</th><th>Weather</th></tr>
+          <tr><td>NL-Farm-7</td><td>1</td><td>1</td><td>0</td><td>0</td><td>${statusBadge('Operational')}</td></tr>
+          <tr><td>DE-Offshore-2</td><td>0</td><td>0</td><td>1</td><td>1</td><td>${statusBadge('Questionable')}</td></tr>
+          <tr><td>DK-Wind-1</td><td>1</td><td>1</td><td>0</td><td>0</td><td>${statusBadge('Operational')}</td></tr>
+          <tr><td>UK-Coast-3</td><td>1</td><td>0</td><td>1</td><td>1</td><td>${statusBadge('Operational')}</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Security Overview</span></div>
+      <div class="card-body">
+        <div class="alert-item"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Interlock bypass attempt</div><div class="alert-meta">WND-2401-001-1002 &mdash; 09:05 today</div></div></div>
+        <div class="alert-item"><div class="alert-dot dot-red"></div><div class="alert-body"><div class="alert-title">Unencrypted link — DE-Offshore-2</div><div class="alert-meta">WND-2401-002-2002 &mdash; TLS failure</div></div></div>
+        <div class="alert-item"><div class="alert-dot dot-yellow"></div><div class="alert-body"><div class="alert-title">Non-secure comms flagged</div><div class="alert-meta">WhatsApp use detected &mdash; Policy SEC-007</div></div></div>
+        <div class="alert-item"><div class="alert-dot dot-blue"></div><div class="alert-body"><div class="alert-title">Active sessions: ${sessions.length}</div><div class="alert-meta">All with MFA verified &mdash; ${sessions.filter(s=>s.active).length} online now</div></div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Recent Activity</span></div>
+      <div class="card-body">
+        ${auditLog.slice(0,5).map(l=>`
+        <div class="alert-item">
+          <div class="alert-dot ${l.risk==='Critical'||l.risk==='High'?'dot-red':l.risk==='Medium'?'dot-yellow':'dot-blue'}"></div>
+          <div class="alert-body"><div class="alert-title">${l.action}</div><div class="alert-meta">${l.user} &mdash; ${l.ts}</div></div>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Today's Flights</span></div>
+      <div class="card-body">
+        <table>
+          <tr><th>Drone</th><th>Site</th><th>Type</th><th>Status</th></tr>
+          ${schedules.filter(s=>s.date==='2026-05-26').map(s=>`
+          <tr><td class="mono">${s.drone.slice(-8)}</td><td>${s.site}</td><td>${s.type}</td><td>${statusBadge(s.status)}</td></tr>`).join('')}
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderFleet() {
+  return `
+  <div class="page-title">Drone Fleet</div>
+  <div class="stats-row cols-4">
+    <div class="stat-card"><div class="val">${drones.length}</div><div class="lbl">Total Aircraft</div></div>
+    <div class="stat-card"><div class="val" style="color:#1565c0">${drones.filter(d=>d.status==='Flight In-Progress').length}</div><div class="lbl">In Flight</div></div>
+    <div class="stat-card"><div class="val" style="color:#c62828">${drones.filter(d=>!d.enc).length}</div><div class="lbl">Unencrypted Links</div><div class="chg warn">⚠ Security risk</div></div>
+    <div class="stat-card"><div class="val" style="color:#e65100">${drones.filter(d=>d.battery<20).length}</div><div class="lbl">Low Battery (&lt;20%)</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Aircraft Registry</span><button class="btn btn-blue btn-sm" onclick="openNewDroneModal()">+ Register Drone</button></div>
+    <div class="card-body">
+      <table>
+        <tr><th>Drone ID</th><th>Model</th><th>Site</th><th>Turbine</th><th>Status</th><th>Battery</th><th>Pilot</th><th>Comms</th></tr>
+        ${drones.map(d=>`
+        <tr>
+          <td class="mono">${d.id}</td>
+          <td>${d.model}</td>
+          <td>${d.site}</td>
+          <td class="mono">${d.turbine}</td>
+          <td>${statusBadge(d.status)}</td>
+          <td>${batBadge(d.battery)}</td>
+          <td>${d.pilot}</td>
+          <td>${d.enc ? '<span class="enc-indicator">AES-256</span>' : '<span class="badge badge-red">UNENCRYPTED</span>'}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderScheduling() {
+  const interlockRisk = schedules.filter(s=>s.groundCrew && s.status==='Pending');
+  return `
+  <div class="page-title">Flight Scheduling</div>
+  ${interlockRisk.length ? `<div class="interlock-banner">⚠ <strong>Pre-Flight Interlock:</strong> ${interlockRisk.length} pending flight(s) have active ground crew on the same turbine. Authorization required before dispatch.</div>` : ''}
+  <div class="stats-row cols-3">
+    <div class="stat-card"><div class="val">${schedules.filter(s=>s.status==='Active').length}</div><div class="lbl">Active Flights Today</div></div>
+    <div class="stat-card"><div class="val" style="color:#e65100">${schedules.filter(s=>s.status==='Pending').length}</div><div class="lbl">Awaiting Authorization</div></div>
+    <div class="stat-card"><div class="val" style="color:#c62828">${interlockRisk.length}</div><div class="lbl">Interlock Conflicts</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Flight Schedule</span><button class="btn btn-blue btn-sm" onclick="openScheduleModal()">+ Schedule Flight</button></div>
+    <div class="card-body">
+      <table>
+        <tr><th>ID</th><th>Drone</th><th>Turbine</th><th>Site</th><th>Type</th><th>Pilot</th><th>Date</th><th>Time</th><th>Auth</th><th>Interlock</th><th>Status</th></tr>
+        ${schedules.map(s=>`
+        <tr>
+          <td class="mono">${s.id}</td>
+          <td class="mono">${s.drone.slice(-8)}</td>
+          <td class="mono">${s.turbine}</td>
+          <td>${s.site}</td>
+          <td>${s.type}</td>
+          <td>${s.pilot}</td>
+          <td>${s.date}</td>
+          <td>${s.time}</td>
+          <td>${statusBadge(s.auth)}</td>
+          <td>${s.groundCrew ? '<span class="badge badge-red">CONFLICT</span>' : '<span class="badge badge-green">CLEAR</span>'}</td>
+          <td>${statusBadge(s.status)}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderTickets() {
+  const priorityOrder = {Critical:0,High:1,Medium:2,Low:3};
+  const sorted = [...tickets].sort((a,b)=>(priorityOrder[a.priority]||9)-(priorityOrder[b.priority]||9));
+  return `
+  <div class="page-title">Ticket System</div>
+  <div class="stats-row cols-4">
+    <div class="stat-card"><div class="val">${tickets.length}</div><div class="lbl">Total Tickets</div></div>
+    <div class="stat-card"><div class="val" style="color:#c62828">${tickets.filter(t=>t.priority==='Critical').length}</div><div class="lbl">Critical</div></div>
+    <div class="stat-card"><div class="val" style="color:#e65100">${tickets.filter(t=>t.status==='Open').length}</div><div class="lbl">Open</div></div>
+    <div class="stat-card"><div class="val" style="color:#2e7d32">${tickets.filter(t=>t.status==='Resolved').length}</div><div class="lbl">Resolved</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">All Tickets</span><button class="btn btn-blue btn-sm" onclick="openTicketModal()">+ New Ticket</button></div>
+    <div class="card-body">
+      <table>
+        <tr><th>ID</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Drone</th><th>Assigned To</th><th>Created</th></tr>
+        ${sorted.map(t=>`
+        <tr>
+          <td class="mono">${t.id}</td>
+          <td>${t.title}</td>
+          <td><span class="chip">${t.type}</span></td>
+          <td>${statusBadge(t.priority)}</td>
+          <td>${statusBadge(t.status)}</td>
+          <td class="mono" style="font-size:11px">${t.drone}</td>
+          <td>${t.assignee}</td>
+          <td>${t.created}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderReports() {
+  return `
+  <div class="page-title">Reports</div>
+  <div class="stats-row cols-3">
+    <div class="stat-card"><div class="val">42</div><div class="lbl">Missions This Month</div><div class="chg up">↑ 12% vs Apr</div></div>
+    <div class="stat-card"><div class="val">98.4%</div><div class="lbl">System Uptime</div><div class="chg up">SLA: 99.99% target</div></div>
+    <div class="stat-card"><div class="val">1.3s</div><div class="lbl">Avg Telemetry Latency</div><div class="chg up">↓ Target &lt;2s ✓</div></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Inspection Summary</span></div>
+      <div class="card-body">
+        <table>
+          <tr><th>Type</th><th>Count</th><th>Pass Rate</th></tr>
+          <tr><td>Routine</td><td>28</td><td>100%</td></tr>
+          <tr><td>Emergency</td><td>6</td><td>83%</td></tr>
+          <tr><td>Training</td><td>5</td><td>100%</td></tr>
+          <tr><td>Other</td><td>3</td><td>100%</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Compliance Status</span></div>
+      <div class="card-body">
+        <table>
+          <tr><th>Regulation</th><th>Jurisdiction</th><th>Status</th></tr>
+          <tr><td>Flight Log Filing</td><td>Netherlands</td><td>${statusBadge('Approved')}</td></tr>
+          <tr><td>Flight Log Filing</td><td>Germany</td><td>${statusBadge('Open')}</td></tr>
+          <tr><td>Wildlife Corridor Check</td><td>Denmark</td><td>${statusBadge('Approved')}</td></tr>
+          <tr><td>Data Residency</td><td>EU (GDPR)</td><td>${statusBadge('Approved')}</td></tr>
+          <tr><td>Comms Encryption</td><td>All Sites</td><td><span class="badge badge-red">Partial</span></td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <div class="card-header"><span class="card-title">Export Data</span></div>
+      <div class="card-body" style="padding:20px;display:flex;gap:12px;flex-wrap:wrap">
+        <button class="btn btn-outline" onclick="alert('Exporting drone_telemetry.csv — AES-256 encrypted archive')">📥 Drone Telemetry (CSV)</button>
+        <button class="btn btn-outline" onclick="alert('Exporting flight_logs.pdf — digitally signed')">📥 Flight Logs (PDF)</button>
+        <button class="btn btn-outline" onclick="alert('Exporting audit_log.json — tamper-evident hash included')">📥 Audit Log (JSON)</button>
+        <button class="btn btn-outline" onclick="alert('Exporting compliance_report.pdf')">📥 Compliance Report (PDF)</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderAuditLog() {
+  return `
+  <div class="page-title">Security Audit Log</div>
+  <div class="stats-row cols-4">
+    <div class="stat-card"><div class="val">${auditLog.length}</div><div class="lbl">Total Log Entries</div></div>
+    <div class="stat-card"><div class="val" style="color:#c62828">${auditLog.filter(l=>l.risk==='Critical'||l.risk==='High').length}</div><div class="lbl">High / Critical</div></div>
+    <div class="stat-card"><div class="val">${auditLog.filter(l=>l.type==='Security').length}</div><div class="lbl">Security Events</div></div>
+    <div class="stat-card"><div class="val">${auditLog.filter(l=>l.type==='Compliance').length}</div><div class="lbl">Compliance Events</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Audit Trail &mdash; <span class="enc-indicator">Tamper-evident log</span></span>
+      <span style="font-size:12px;color:#9e9e9e">UUID v4 Log IDs &nbsp;|&nbsp; UTC timestamps</span>
+    </div>
+    <div class="card-body">
+      <table>
+        <tr><th>Log ID</th><th>Timestamp</th><th>Type</th><th>User</th><th>Action</th><th>Source IP</th><th>Risk</th></tr>
+        ${auditLog.map(l=>`
+        <tr>
+          <td class="mono" style="font-size:10px">${l.id}</td>
+          <td style="font-size:12px;white-space:nowrap">${l.ts}</td>
+          <td><span class="chip">${l.type}</span></td>
+          <td>${l.user}</td>
+          <td style="font-size:12px">${l.action}</td>
+          <td class="mono" style="font-size:11px">${l.ip}</td>
+          <td class="${l.risk==='Critical'?'risk-high':l.risk==='High'?'risk-high':l.risk==='Medium'?'risk-med':'risk-low'}">${l.risk}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>`;
+}
+
+function renderSessions() {
+  return `
+  <div class="page-title">Active Sessions</div>
+  <div class="stats-row cols-3">
+    <div class="stat-card"><div class="val">${sessions.length}</div><div class="lbl">Active Sessions</div></div>
+    <div class="stat-card"><div class="val" style="color:#2e7d32">${sessions.filter(s=>s.active).length}</div><div class="lbl">Authenticated (MFA)</div></div>
+    <div class="stat-card"><div class="val" style="color:#e65100">2h</div><div class="lbl">Session Timeout</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Session Registry &mdash; <span class="enc-indicator">JWT / Base64 tokens</span></span></div>
+    <div class="card-body">
+      <table>
+        <tr><th>Session Token (truncated)</th><th>User</th><th>Role</th><th>IP Address</th><th>Started</th><th>Expires</th><th>Site</th><th>Action</th></tr>
+        ${sessions.map((s,i)=>`
+        <tr class="session-row">
+          <td class="mono" style="font-size:10px">${shortToken(s.token)}</td>
+          <td>${s.user}</td>
+          <td><span class="role-tag">${s.role}</span></td>
+          <td class="mono">${s.ip}</td>
+          <td>${s.started}</td>
+          <td>${s.expires}</td>
+          <td>${s.site}</td>
+          <td><button class="btn btn-red btn-sm" onclick="forceLogout(${i})">Force Logout</button></td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>`;
+}
+
+function forceLogout(i) {
+  const s = sessions[i];
+  if (!s) return;
+  logAudit('Security', ROLES[currentRole].name, `Force logout — ${s.user} session terminated`, s.ip, 'Medium');
+  sessions.splice(i,1);
+  setPage('sessions');
+}
+
+function renderAlerts() {
+  const sevColor = {Critical:'dot-red',High:'dot-red',Medium:'dot-yellow',Low:'dot-blue'};
+  return `
+  <div class="page-title">Security Alerts</div>
+  <div class="stats-row cols-3">
+    <div class="stat-card"><div class="val" style="color:#c62828">${alerts.filter(a=>!a.ack&&(a.sev==='Critical'||a.sev==='High')).length}</div><div class="lbl">Unacknowledged Critical/High</div></div>
+    <div class="stat-card"><div class="val" style="color:#e65100">${alerts.filter(a=>!a.ack).length}</div><div class="lbl">Total Unacknowledged</div></div>
+    <div class="stat-card"><div class="val" style="color:#2e7d32">${alerts.filter(a=>a.ack).length}</div><div class="lbl">Acknowledged</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Alert Queue</span></div>
+    <div class="card-body">
+      ${alerts.map((a,i)=>`
+      <div class="alert-item" style="opacity:${a.ack?0.55:1}">
+        <div class="alert-dot ${sevColor[a.sev]||'dot-blue'}"></div>
+        <div class="alert-body">
+          <div class="alert-title">${statusBadge(a.sev)} &nbsp; ${a.title}</div>
+          <div class="alert-meta" style="margin-top:4px">${a.detail}</div>
+          <div class="alert-meta">${a.ts}</div>
+        </div>
+        ${!a.ack ? `<button class="btn btn-outline btn-sm" onclick="ackAlert(${i})">Acknowledge</button>` : '<span style="font-size:11px;color:#9e9e9e">Acknowledged</span>'}
+      </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function ackAlert(i) {
+  logAudit('Security', ROLES[currentRole].name, `Alert acknowledged: ${alerts[i].title}`, '10.20.1.12', 'Low');
+  alerts[i].ack = true;
+  const unack = alerts.filter(a=>!a.ack).length;
+  const badge = document.getElementById('alert-count-badge');
+  if (badge) badge.textContent = unack;
+  setPage('alerts');
+}
+
+function renderUsers() {
+  return `
+  <div class="page-title">User Management &amp; RBAC</div>
+  <div class="stats-row cols-3">
+    <div class="stat-card"><div class="val">${users.length}</div><div class="lbl">Total Users</div></div>
+    <div class="stat-card"><div class="val" style="color:#2e7d32">${users.filter(u=>u.mfa).length}</div><div class="lbl">MFA Enrolled</div></div>
+    <div class="stat-card"><div class="val" style="color:#c62828">${users.filter(u=>!u.mfa).length}</div><div class="lbl">MFA Not Enrolled</div><div class="chg warn">⚠ Policy violation</div></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Personnel &amp; Access Control &mdash; <span style="font-size:12px;color:#9e9e9e">Microsoft Active Directory</span></span></div>
+    <div class="card-body">
+      <table>
+        <tr><th>Employee ID</th><th>Name</th><th>Role</th><th>Job Title</th><th>Site</th><th>MFA</th><th>Status</th><th>Last Login</th></tr>
+        ${users.map(u=>`
+        <tr>
+          <td class="mono">${u.id}</td>
+          <td>${u.name}</td>
+          <td><span class="role-tag">${u.role}</span></td>
+          <td>${u.title}</td>
+          <td>${u.site}</td>
+          <td>${u.mfa ? '<span class="badge badge-green">✓ Enabled</span>' : '<span class="badge badge-red">✗ Missing</span>'}</td>
+          <td>${statusBadge(u.status)}</td>
+          <td style="font-size:12px">${u.lastLogin}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+  </div>`;
+}
+
+// ==================== MODALS ====================
+function openNewDroneModal() {
+  document.getElementById('modal-bg').style.display='flex';
+  document.getElementById('modal-box').innerHTML = `
+  <div class="modal-head"><h3>Register New Drone</h3><span class="modal-close" onclick="closeModal()">✕</span></div>
+  <div class="form-grid">
+    <div class="form-field full"><label>Drone ID (format: XXX-####-###-####)</label><input placeholder="WND-2401-005-5001"></div>
+    <div class="form-field"><label>Model</label><select><option>DJI Matrice 350</option><option>Skydio X10D</option><option>Autel EVO II</option></select></div>
+    <div class="form-field"><label>Assigned Site</label><select><option>NL-Farm-7</option><option>DE-Offshore-2</option><option>DK-Wind-1</option><option>UK-Coast-3</option></select></div>
+    <div class="form-field"><label>Wind Turbine ID (format: XXX-####-###)</label><input placeholder="NLF-7001-010"></div>
+    <div class="form-field"><label>Battery Status (0–100)</label><input type="number" min="0" max="100" placeholder="100"></div>
+    <div class="form-field"><label>Comms Encryption</label><select><option>AES-256 (Required)</option></select></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-blue" onclick="closeModal();alert('Drone registered and logged to audit trail.')">Register</button></div>`;
+}
+
+function openScheduleModal() {
+  document.getElementById('modal-bg').style.display='flex';
+  document.getElementById('modal-box').innerHTML = `
+  <div class="modal-head"><h3>Schedule Flight Mission</h3><span class="modal-close" onclick="closeModal()">✕</span></div>
+  <div class="form-grid">
+    <div class="form-field"><label>Drone ID</label><select>${drones.map(d=>`<option>${d.id}</option>`).join('')}</select></div>
+    <div class="form-field"><label>Wind Turbine ID</label><input placeholder="NLF-7001-011"></div>
+    <div class="form-field"><label>Inspection Type</label><select><option>Routine</option><option>Emergency</option><option>Training</option><option>Other</option></select></div>
+    <div class="form-field"><label>Assigned Pilot</label><select><option>Marcus Reid</option><option>Emma Johansson</option><option>Tom Briggs</option><option>Lars Müller</option></select></div>
+    <div class="form-field"><label>Date</label><input type="date" value="2026-05-27"></div>
+    <div class="form-field"><label>Time</label><input type="time" value="08:00"></div>
+    <div class="form-field full"><label>Ground Crew Active on Turbine?</label><select><option value="no">No — Interlock Clear</option><option value="yes">Yes — Interlock Authorization Required</option></select></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-blue" onclick="closeModal();alert('Flight scheduled — pending safety authorization.')">Submit for Authorization</button></div>`;
+}
+
+function openTicketModal() {
+  document.getElementById('modal-bg').style.display='flex';
+  document.getElementById('modal-box').innerHTML = `
+  <div class="modal-head"><h3>Create New Ticket</h3><span class="modal-close" onclick="closeModal()">✕</span></div>
+  <div class="form-grid">
+    <div class="form-field full"><label>Title</label><input placeholder="Describe the issue"></div>
+    <div class="form-field"><label>Type</label><select><option>Maintenance</option><option>Security</option><option>Inspection</option><option>Compliance</option></select></div>
+    <div class="form-field"><label>Priority</label><select><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>
+    <div class="form-field"><label>Drone ID</label><select><option>—</option>${drones.map(d=>`<option>${d.id}</option>`).join('')}</select></div>
+    <div class="form-field"><label>Assign To</label><select>${users.map(u=>`<option>${u.name}</option>`).join('')}</select></div>
+    <div class="form-field full"><label>Description</label><textarea rows="3" placeholder="Additional details..."></textarea></div>
+  </div>
+  <div class="form-actions"><button class="btn btn-outline" onclick="closeModal()">Cancel</button><button class="btn btn-blue" onclick="closeModal();alert('Ticket created and logged.')">Submit Ticket</button></div>`;
+}
+
+function closeModal(e) {
+  if (!e || e.target.id==='modal-bg') {
+    document.getElementById('modal-bg').style.display='none';
+  }
+}
+</script>
+</body>
+</html>
