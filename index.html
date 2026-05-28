@@ -40,6 +40,8 @@
     .btn:hover { background: #e8f0fe; }
     .btn-primary { background: #1a73e8; color: white; border-color: #1a73e8; }
     .btn-primary:hover { background: #1765cc; }
+    .btn:disabled { color: #9aa0a6; border-color: #e0e0e0; background: #f8f9fa; cursor: not-allowed; }
+    .btn:disabled:hover { background: #f8f9fa; }
     .btn-danger { background: #d93025; color: white; border-color: #d93025; font-size: 12px; padding: 4px 10px; }
     .btn-danger:hover { background: #c5221f; }
     .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
@@ -102,6 +104,25 @@
     .enc-ok   { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #e6f4ea; color: #1e8e3e; font-weight: 500; }
     .enc-fail { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; background: #fce8e6; color: #d93025; font-weight: 500; }
     .role-chip { font-size: 11px; background: #e8f0fe; color: #1a73e8; border-radius: 4px; padding: 2px 8px; font-weight: 500; }
+    .row-click { cursor: pointer; }
+    .row-click:hover td { background: #e8f0fe !important; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .detail-field { border: 1px solid #f1f3f4; border-radius: 6px; padding: 10px 12px; background: #fafafa; }
+    .detail-label { font-size: 11px; color: #80868b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .detail-value { font-size: 13px; color: #202124; }
+    .camera-panel { background: #111; border-radius: 8px; border: 1px solid #3c4043; height: 220px; position: relative; overflow: hidden; margin-bottom: 16px; color: #e8eaed; }
+    .camera-panel:before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px), linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px); background-size: 44px 44px; }
+    .camera-target { position: absolute; left: 50%; top: 50%; width: 110px; height: 110px; transform: translate(-50%,-50%); border: 1px solid #9aa0a6; border-radius: 50%; }
+    .camera-target:before, .camera-target:after { content: ""; position: absolute; background: #9aa0a6; }
+    .camera-target:before { width: 150px; height: 1px; left: -20px; top: 54px; }
+    .camera-target:after { width: 1px; height: 150px; left: 54px; top: -20px; }
+    .camera-meta { position: absolute; left: 12px; right: 12px; bottom: 10px; display: flex; justify-content: space-between; font-size: 11px; color: #bdc1c6; }
+    .camera-live { position: absolute; top: 10px; left: 12px; font-size: 11px; color: #fce8e6; background: rgba(217,48,37,.18); border: 1px solid rgba(217,48,37,.5); border-radius: 4px; padding: 3px 8px; }
+    .control-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .control-note { font-size: 12px; color: #5f6368; line-height: 1.5; margin-top: 10px; }
+    .inline-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .tab-btn { border: 1px solid #dadce0; background: white; color: #5f6368; border-radius: 18px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+    .tab-btn.active { background: #e8f0fe; color: #1a73e8; border-color: #d2e3fc; font-weight: 500; }
     /* Auth */
     #auth-screen { min-height: 100vh; background: #f1f3f4; display: flex; flex-direction: column; }
     .auth-topbar { background: #1a73e8; height: 56px; display: flex; align-items: center; padding: 0 16px; }
@@ -133,11 +154,12 @@
       <div class="form-row">
         <label class="form-label">Account / Role</label>
         <select class="form-select" id="login-role">
+          <option value="tech" selected>Marcus Reid - Maintenance Technician</option>
           <option value="ops">Sarah Chen &mdash; Operations Manager</option>
           <option value="cso">Anna Kowalski &mdash; Chief Security Officer</option>
-          <option value="tech">Marcus Reid &mdash; Maintenance Technician</option>
           <option value="safety">Alex Johnson &mdash; Safety Officer</option>
           <option value="analyst">Jordan Lee &mdash; IT / Data Analyst</option>
+          <option value="admin">Priya Nair - IT Security Administrator</option>
         </select>
       </div>
       <div class="form-row">
@@ -174,32 +196,35 @@
 <script>
 // ── STATE ──────────────────────────────────────────────────────────────
 var page = 'dashboard';
-var currentRole = 'ops';
+var currentRole = 'tech';
 var expandedTicket = null;
-var showModal = null; // 'ticket' | 'drone' | 'schedule'
+var showModal = null; // 'ticket' | 'drone' | 'schedule' | 'droneDetail'
+var selectedDroneId = null;
 var filterStatus = 'all', filterPriority = 'all', filterSearch = '';
+var droneFilter = 'all';
 var mfaInterval, mfaTime = 30;
-var newTicket = { title:'', priority:'medium', assignee:'', site:'NL-Farm-7', category:'Hardware', description:'' };
+var newTicket = { title:'', priority:'medium', assignee:'', site:'NL-Farm-7', category:'Maintenance', description:'' };
 
 var ROLES = {
-  ops:     { name:'Sarah Chen',    initials:'SC', title:'Operations Manager',     site:'NL-Farm-7',     pages:['dashboard','fleet','tickets','schedule','reports','auditlog','sessions','alerts','users'] },
-  cso:     { name:'Anna Kowalski', initials:'AK', title:'Chief Security Officer', site:'HQ-Amsterdam',  pages:['dashboard','auditlog','sessions','alerts','users','reports'] },
-  tech:    { name:'Marcus Reid',   initials:'MR', title:'Maintenance Technician', site:'NL-Farm-7',     pages:['dashboard','fleet','tickets'] },
-  safety:  { name:'Alex Johnson',  initials:'AJ', title:'Safety Officer',         site:'NL-Farm-7',     pages:['dashboard','schedule','tickets','auditlog'] },
-  analyst: { name:'Jordan Lee',    initials:'JL', title:'IT / Data Analyst',      site:'HQ-Amsterdam',  pages:['dashboard','fleet','reports','auditlog'] }
+  tech:    { name:'Marcus Reid',   initials:'MR', title:'Maintenance Technician',     site:'NL-Farm-7',     pages:['dashboard','fleet','tickets','schedule'], canControl:true,  canAdmin:false },
+  ops:     { name:'Sarah Chen',    initials:'SC', title:'Operations Manager',         site:'NL-Farm-7',     pages:['dashboard','fleet','tickets','schedule','reports','alerts'], canControl:true,  canAdmin:false },
+  safety:  { name:'Alex Johnson',  initials:'AJ', title:'Safety Officer',             site:'NL-Farm-7',     pages:['dashboard','fleet','tickets','schedule','reports','alerts'], canControl:true,  canAdmin:false },
+  cso:     { name:'Anna Kowalski', initials:'AK', title:'Chief Security Officer',     site:'HQ-Amsterdam',  pages:['dashboard','alerts','auditlog','reports'], canControl:false, canAdmin:false },
+  analyst: { name:'Jordan Lee',    initials:'JL', title:'IT / Data Analyst',          site:'HQ-Amsterdam',  pages:['dashboard','fleet','reports','auditlog'], canControl:false, canAdmin:false },
+  admin:   { name:'Priya Nair',    initials:'PN', title:'IT Security Administrator',  site:'HQ-Amsterdam',  pages:['dashboard','fleet','tickets','schedule','reports','alerts','auditlog','sessions','users'], canControl:true,  canAdmin:true }
 };
 
 // ── DATA ───────────────────────────────────────────────────────────────
 var drones = [
-  { id:'WND-2401-001-1001', short:'NL-01', model:'DJI Matrice 350', site:'NL-Farm-7',    turbine:'NLF-7001-003', status:'active',      battery:72, pilot:'Marcus Reid',    enc:true  },
-  { id:'WND-2401-001-1002', short:'NL-02', model:'DJI Matrice 350', site:'NL-Farm-7',    turbine:'NLF-7001-007', status:'idle',        battery:48, pilot:'—',              enc:true  },
-  { id:'WND-2401-002-2001', short:'DE-01', model:'Skydio X10D',     site:'DE-Offshore-2',turbine:'DEO-2002-011', status:'idle',        battery:95, pilot:'—',              enc:true  },
-  { id:'WND-2401-002-2002', short:'DE-02', model:'Skydio X10D',     site:'DE-Offshore-2',turbine:'—',           status:'grounded',    battery:12, pilot:'—',              enc:false },
-  { id:'WND-2401-003-3001', short:'DK-01', model:'Autel EVO II',    site:'DK-Wind-1',   turbine:'DKW-1003-002', status:'active',      battery:61, pilot:'Emma Johansson', enc:true  },
-  { id:'WND-2401-003-3002', short:'DK-02', model:'Autel EVO II',    site:'DK-Wind-1',   turbine:'—',           status:'idle',        battery:34, pilot:'—',              enc:true  },
-  { id:'WND-2401-004-4001', short:'UK-01', model:'DJI Matrice 350', site:'UK-Coast-3',  turbine:'UKC-3004-005', status:'idle',        battery:88, pilot:'—',              enc:true  },
-  { id:'WND-2401-004-4002', short:'UK-02', model:'DJI Matrice 350', site:'UK-Coast-3',  turbine:'—',           status:'maintenance', battery:5,  pilot:'—',              enc:false },
-  { id:'WND-2401-004-4003', short:'UK-03', model:'Skydio X10D',     site:'UK-Coast-3',  turbine:'UKC-3004-009', status:'active',      battery:55, pilot:'Tom Briggs',     enc:true  }
+  { id:'WND-2401-001-1001', short:'NL-01', model:'DJI Matrice 350', site:'NL-Farm-7',     turbine:'NLF-7001-003', status:'Flight In-Progress', battery:72, pilot:'Marcus Reid',    enc:true,  firmware:'3.2.0', health:'Nominal',       weather:'Operational',  latency:'1.1s',  camera:'Online',  storage:'68%', mission:'Blade thermal scan',       altitude:'82m', speed:'11 m/s' },
+  { id:'WND-2401-001-1002', short:'NL-02', model:'DJI Matrice 350', site:'NL-Farm-7',     turbine:'NLF-7001-007', status:'Docked',             battery:48, pilot:'Unassigned',     enc:true,  firmware:'3.2.0', health:'Ready',         weather:'Questionable', latency:'1.4s',  camera:'Standby', storage:'41%', mission:'Pending routine check',    altitude:'0m',  speed:'0 m/s' },
+  { id:'WND-2401-002-2001', short:'DE-01', model:'Skydio X10D',     site:'DE-Offshore-2', turbine:'DEO-2002-011', status:'Docked',             battery:95, pilot:'Unassigned',     enc:true,  firmware:'3.2.0', health:'Ready',         weather:'Operational',  latency:'1.0s',  camera:'Standby', storage:'82%', mission:'Training standby',         altitude:'0m',  speed:'0 m/s' },
+  { id:'WND-2401-002-2002', short:'DE-02', model:'Skydio X10D',     site:'DE-Offshore-2', turbine:'None',         status:'Offline',            battery:12, pilot:'Unassigned',     enc:false, firmware:'3.1.2', health:'Security hold', weather:'Offline',      latency:'15.4s', camera:'Offline', storage:'19%', mission:'Grounded - TLS failure',   altitude:'0m',  speed:'0 m/s' },
+  { id:'WND-2401-003-3001', short:'DK-01', model:'Autel EVO II',    site:'DK-Wind-1',    turbine:'DKW-1003-002', status:'Flight In-Progress', battery:61, pilot:'Emma Johansson', enc:true,  firmware:'3.2.0', health:'Nominal',       weather:'Operational',  latency:'1.3s',  camera:'Online',  storage:'52%', mission:'Emergency nacelle review', altitude:'76m', speed:'9 m/s' },
+  { id:'WND-2401-003-3002', short:'DK-02', model:'Autel EVO II',    site:'DK-Wind-1',    turbine:'None',         status:'Charging',           battery:34, pilot:'Unassigned',     enc:true,  firmware:'3.1.2', health:'Firmware due',  weather:'Operational',  latency:'1.2s',  camera:'Standby', storage:'77%', mission:'Charging bay 2',          altitude:'0m',  speed:'0 m/s' },
+  { id:'WND-2401-004-4001', short:'UK-01', model:'DJI Matrice 350', site:'UK-Coast-3',   turbine:'UKC-3004-005', status:'Docked',             battery:88, pilot:'Unassigned',     enc:true,  firmware:'3.2.0', health:'Ready',         weather:'Operational',  latency:'1.2s',  camera:'Standby', storage:'63%', mission:'Ready for dispatch',      altitude:'0m',  speed:'0 m/s' },
+  { id:'WND-2401-004-4002', short:'UK-02', model:'DJI Matrice 350', site:'UK-Coast-3',   turbine:'None',         status:'Offline',            battery:5,  pilot:'Unassigned',     enc:false, firmware:'3.1.1', health:'Battery failed', weather:'Offline',      latency:'N/A',   camera:'Offline', storage:'34%', mission:'Battery replacement',     altitude:'0m',  speed:'0 m/s' },
+  { id:'WND-2401-004-4003', short:'UK-03', model:'Skydio X10D',     site:'UK-Coast-3',   turbine:'UKC-3004-009', status:'Flight In-Progress', battery:55, pilot:'Tom Briggs',     enc:true,  firmware:'3.2.0', health:'Nominal',       weather:'Operational',  latency:'1.5s',  camera:'Online',  storage:'47%', mission:'Offshore blade imaging',  altitude:'91m', speed:'12 m/s' }
 ];
 
 var tickets = [
@@ -254,7 +279,8 @@ var users = [
   { id:'EMP-001345', name:'Jordan Lee',    roleKey:'analyst',title:'IT / Data Analyst',      site:'HQ-Amsterdam', status:'Active', mfa:false, lastLogin:'2026-05-25 16:55' },
   { id:'EMP-001678', name:'Emma Johansson',roleKey:'tech',   title:'Drone Operator',         site:'DK-Wind-1',    status:'Active', mfa:true,  lastLogin:'2026-05-26 07:50' },
   { id:'EMP-001900', name:'Lars Muller',   roleKey:'tech',   title:'Drone Operator',         site:'DE-Offshore-2',status:'Active', mfa:true,  lastLogin:'2026-05-24 09:00' },
-  { id:'EMP-002100', name:'Tom Briggs',    roleKey:'tech',   title:'Drone Operator',         site:'UK-Coast-3',   status:'Active', mfa:true,  lastLogin:'2026-05-26 10:00' }
+  { id:'EMP-002100', name:'Tom Briggs',    roleKey:'tech',   title:'Drone Operator',         site:'UK-Coast-3',   status:'Active', mfa:true,  lastLogin:'2026-05-26 10:00' },
+  { id:'EMP-002400', name:'Priya Nair',     roleKey:'admin',  title:'IT Security Administrator', site:'HQ-Amsterdam', status:'Active', mfa:true, lastLogin:'2026-05-26 09:40' }
 ];
 
 var activity = [
@@ -273,7 +299,7 @@ function priorityBadge(p) {
   return '<span class="badge badge-green">Low</span>';
 }
 function statusBadge(s) {
-  var map = { open:'badge-blue', 'in-progress':'badge-orange', resolved:'badge-green', Active:'badge-green', Pending:'badge-yellow', Approved:'badge-green', active:'badge-green', idle:'badge-gray', maintenance:'badge-yellow', grounded:'badge-red', Operational:'badge-green', Questionable:'badge-yellow', Offline:'badge-red' };
+  var map = { open:'badge-blue', 'in-progress':'badge-orange', resolved:'badge-green', Active:'badge-green', Pending:'badge-yellow', Approved:'badge-green', 'Flight In-Progress':'badge-green', Docked:'badge-blue', Charging:'badge-yellow', Offline:'badge-red', Ready:'badge-green', Operational:'badge-green', Questionable:'badge-yellow', 'Security hold':'badge-red', 'Battery failed':'badge-red', 'Firmware due':'badge-yellow', Nominal:'badge-green' };
   return '<span class="badge ' + (map[s] || 'badge-gray') + '">' + s + '</span>';
 }
 function batBar(v, w) {
@@ -292,6 +318,21 @@ function uuid() {
 function nowStr() { return new Date().toISOString().replace('T',' ').substring(0,16); }
 function logAudit(type, user, action, ip, risk) {
   auditLog.unshift({ id:uuid(), ts:nowStr(), type:type, user:user, action:action, ip:ip, risk:risk });
+}
+function visibleDrones() {
+  var r = ROLES[currentRole];
+  if (currentRole === 'tech') return drones.filter(function(d){ return d.site === r.site || d.pilot === r.name; });
+  if (currentRole === 'ops' || currentRole === 'safety') return drones.filter(function(d){ return d.site === r.site || d.status === 'Flight In-Progress'; });
+  return drones;
+}
+function visibleTickets() {
+  var r = ROLES[currentRole];
+  if (currentRole === 'tech') return tickets.filter(function(t){ return t.assignee === r.name || t.site === r.site || ['Hardware','Maintenance','Airframe / Propulsion','Battery / Charging','Camera / Sensor Payload','Firmware / Software'].includes(t.category); });
+  if (currentRole === 'ops' || currentRole === 'safety') return tickets.filter(function(t){ return t.site === r.site || t.site === 'All Sites' || ['Safety','Mission Safety'].includes(t.category); });
+  return tickets;
+}
+function selectedDrone() {
+  return drones.find(function(d){ return d.id === selectedDroneId; }) || visibleDrones()[0] || drones[0];
 }
 
 // ── AUTH ───────────────────────────────────────────────────────────────
@@ -354,18 +395,18 @@ function render() {
   var alertLabel = 'Alerts' + (unackCount > 0 ? ' <span style="background:#d93025;color:white;border-radius:10px;font-size:10px;padding:1px 6px;vertical-align:middle">' + unackCount + '</span>' : '');
 
   var sidebar =
-    navItem('dashboard','&#9632;','Dashboard') +
-    navItem('fleet','&#9670;','Drone Fleet') +
-    '<div class="nav-section">Maintenance</div>' +
-    navItem('tickets','&#9679;','Ticket System') +
-    navItem('schedule','&#9654;','Scheduling') +
+    navItem('dashboard','OV', currentRole === 'tech' ? 'Technician Dashboard' : 'Operations Overview') +
+    navItem('fleet','DR','Drone Operations') +
+    '<div class="nav-section">Field Work</div>' +
+    navItem('tickets','WK','Maintenance Queue') +
+    navItem('schedule','MS','Flight Missions') +
     '<div class="nav-section">Data</div>' +
-    navItem('reports','&#9650;','Reports') +
+    navItem('reports','RP','Compliance Reports') +
     (ROLES[currentRole].pages.some(function(p){ return ['auditlog','sessions','alerts','users'].includes(p); }) ? '<div class="nav-section">Security</div>' : '') +
-    navItem('auditlog','&#8801;','Audit Log') +
-    navItem('sessions','&#9633;','Sessions') +
-    navItem('alerts','&#9651;',alertLabel) +
-    navItem('users','&#9675;','User Management') +
+    navItem('alerts','AL',alertLabel) +
+    navItem('auditlog','EV','Security Events') +
+    navItem('sessions','SS','Session Control') +
+    navItem('users','AC','Access Admin') +
     '<div class="nav-spacer"></div>' +
     '<div class="nav-logout" onclick="doLogout()">&larr; Sign Out</div>';
 
@@ -404,13 +445,18 @@ function renderPage() {
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────
 function renderDashboard() {
-  var active  = drones.filter(function(d){ return d.status==='active'; }).length;
-  var openCt  = tickets.filter(function(t){ return t.status!=='resolved'; }).length;
-  var highP   = tickets.filter(function(t){ return (t.priority==='high'||t.priority==='critical') && t.status!=='resolved'; }).length;
-  var unenc   = drones.filter(function(d){ return !d.enc; }).length;
+  var scopedDrones = visibleDrones();
+  var scopedTickets = visibleTickets();
+  var active  = scopedDrones.filter(function(d){ return d.status==='Flight In-Progress'; }).length;
+  var openCt  = scopedTickets.filter(function(t){ return t.status!=='resolved'; }).length;
+  var highP   = scopedTickets.filter(function(t){ return (t.priority==='high'||t.priority==='critical') && t.status!=='resolved'; }).length;
+  var lowBatt = scopedDrones.filter(function(d){ return d.battery < 20; }).length;
+  var title = currentRole === 'tech' ? 'Technician Dashboard' : 'Operations Overview';
+  var fleetButton = ROLES[currentRole].pages.includes('fleet') ? '<button class="btn" onclick="setPage(\'fleet\')">Open drones</button>' : '';
+  var queueButton = ROLES[currentRole].pages.includes('tickets') ? '<button class="btn" onclick="setPage(\'tickets\')">View queue</button>' : '';
 
-  var droneRows = drones.slice(0,5).map(function(d) {
-    return '<div class="drone-row">' +
+  var droneRows = scopedDrones.slice(0,5).map(function(d) {
+    return '<div class="drone-row" style="cursor:pointer" onclick="openDroneDetail(\'' + d.id + '\')">' +
       '<span style="font-size:12px;font-weight:500;width:48px;color:#202124;flex-shrink:0">' + d.short + '</span>' +
       statusBadge(d.status) +
       '<div style="flex:1">' + batBar(d.battery, 80) + '</div>' +
@@ -426,8 +472,9 @@ function renderDashboard() {
       '</div>';
   }).join('');
 
-  var tktRows = tickets.filter(function(t){ return t.status!=='resolved'; }).slice(0,4).map(function(t) {
-    return '<tr onclick="setPage(\'tickets\')" style="cursor:pointer">' +
+  var tktRows = scopedTickets.filter(function(t){ return t.status!=='resolved'; }).slice(0,4).map(function(t) {
+    var rowOpen = ROLES[currentRole].pages.includes('tickets') ? " onclick=\"setPage('tickets')\" style=\"cursor:pointer\"" : '';
+    return '<tr' + rowOpen + '>' +
       '<td style="color:#1a73e8;font-weight:500">' + t.id + '</td>' +
       '<td>' + t.title + '</td>' +
       '<td>' + priorityBadge(t.priority) + '</td>' +
@@ -435,59 +482,74 @@ function renderDashboard() {
       '<td style="color:#5f6368">' + t.assignee + '</td></tr>';
   }).join('');
 
-  return '<div class="page-title">Overview</div>' +
+  return '<div class="page-title">' + title + '</div>' +
     '<div class="stat-grid">' +
-      '<div class="stat-card"><div class="stat-label">Active Drones</div><div class="stat-value" style="color:#1a73e8">' + active + '</div><div class="stat-sub">of ' + drones.length + ' total aircraft</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Open Tickets</div><div class="stat-value">' + openCt + '</div><div class="stat-sub ' + (highP>0?'bad':'') + '">' + highP + ' high / critical</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Unencrypted Links</div><div class="stat-value" style="color:#d93025">' + unenc + '</div><div class="stat-sub bad">Security action required</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Unack. Alerts</div><div class="stat-value" style="color:#f29900">' + alerts.filter(function(a){return !a.ack;}).length + '</div><div class="stat-sub warn">Pending review</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Drones in Flight</div><div class="stat-value" style="color:#1a73e8">' + active + '</div><div class="stat-sub">visible aircraft: ' + scopedDrones.length + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Assigned Work Orders</div><div class="stat-value">' + openCt + '</div><div class="stat-sub ' + (highP>0?'bad':'') + '">' + highP + ' high / critical</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Low Battery Drones</div><div class="stat-value" style="color:#d93025">' + lowBatt + '</div><div class="stat-sub ' + (lowBatt>0?'bad':'') + '">Battery_Status under 20%</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Today Missions</div><div class="stat-value" style="color:#f29900">' + schedules.filter(function(s){return s.date==='2026-05-26' && s.status==='Active';}).length + '</div><div class="stat-sub warn">active inspection window</div></div>' +
     '</div>' +
     '<div class="two-col">' +
-      '<div class="card"><div class="section-header"><span class="section-title">Fleet Status</span><button class="btn" onclick="setPage(\'fleet\')">View all</button></div>' + droneRows + '</div>' +
-      '<div class="card"><div class="section-header"><span class="section-title">Recent Activity</span></div>' + actRows + '</div>' +
+      '<div class="card"><div class="section-header"><span class="section-title">Drone Readiness</span>' + fleetButton + '</div>' + droneRows + '</div>' +
+      '<div class="card"><div class="section-header"><span class="section-title">Field Activity</span></div>' + actRows + '</div>' +
     '</div>' +
-    '<div class="card"><div class="section-header"><span class="section-title">Open Tickets</span><button class="btn" onclick="setPage(\'tickets\')">View all</button></div>' +
+    '<div class="card"><div class="section-header"><span class="section-title">Maintenance Work Queue</span>' + queueButton + '</div>' +
       '<table class="table"><thead><tr><th>ID</th><th>Title</th><th>Priority</th><th>Status</th><th>Assignee</th></tr></thead><tbody>' + tktRows + '</tbody></table></div>';
 }
 
 // ── FLEET ──────────────────────────────────────────────────────────────
 function renderFleet() {
-  var rows = drones.map(function(d) {
-    return '<tr><td class="mono">' + d.id + '</td><td style="color:#5f6368">' + d.model + '</td>' +
+  var scoped = visibleDrones();
+  var filtered = scoped.filter(function(d){
+    if (droneFilter === 'all') return true;
+    if (droneFilter === 'attention') return d.battery < 20 || !d.enc || d.health !== 'Nominal' && d.health !== 'Ready';
+    return d.status === droneFilter;
+  });
+  var rows = filtered.map(function(d) {
+    return '<tr class="row-click" onclick="openDroneDetail(\'' + d.id + '\')"><td class="mono">' + d.id + '</td><td style="color:#5f6368">' + d.model + '</td>' +
       '<td>' + statusBadge(d.status) + '</td>' +
       '<td>' + batBar(d.battery, 80) + '</td>' +
+      '<td>' + statusBadge(d.health) + '</td>' +
+      '<td>' + statusBadge(d.weather) + '</td>' +
       '<td style="color:#5f6368">' + d.site + '</td>' +
       '<td class="mono" style="color:#5f6368">' + d.turbine + '</td>' +
       '<td>' + (d.enc ? '<span class="enc-ok">AES-256</span>' : '<span class="enc-fail">UNENCRYPTED</span>') + '</td>' +
-      '<td style="color:#5f6368">' + d.pilot + '</td></tr>';
+      '<td style="color:#5f6368">' + d.pilot + '</td><td><button class="btn" onclick="openDroneDetail(\'' + d.id + '\');event.stopPropagation()">Details</button></td></tr>';
   }).join('');
-  var ac = drones.filter(function(d){return d.status==='active';}).length;
-  var id = drones.filter(function(d){return d.status==='idle';}).length;
-  var mn = drones.filter(function(d){return d.status==='maintenance';}).length;
-  var gr = drones.filter(function(d){return d.status==='grounded';}).length;
+  var ac = scoped.filter(function(d){return d.status==='Flight In-Progress';}).length;
+  var docked = scoped.filter(function(d){return d.status==='Docked';}).length;
+  var chg = scoped.filter(function(d){return d.status==='Charging';}).length;
+  var off = scoped.filter(function(d){return d.status==='Offline';}).length;
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
-      '<div class="page-title" style="margin:0">Drone Fleet</div>' +
-      '<button class="btn btn-primary" onclick="openModal(\'drone\')">+ Register Drone</button></div>' +
+      '<div class="page-title" style="margin:0">Drone Operations</div>' +
+      (ROLES[currentRole].canAdmin ? '<button class="btn btn-primary" onclick="openModal(\'drone\')">+ Register Drone</button>' : '<button class="btn" onclick="openDroneDetail(\'' + (scoped[0] ? scoped[0].id : drones[0].id) + '\')">Open Assigned Drone</button>') + '</div>' +
     '<div class="stat-grid">' +
-      '<div class="stat-card"><div class="stat-label">Active</div><div class="stat-value" style="color:#1e8e3e">' + ac + '</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Idle / Ready</div><div class="stat-value" style="color:#1a73e8">' + id + '</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Maintenance</div><div class="stat-value" style="color:#f29900">' + mn + '</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Grounded</div><div class="stat-value" style="color:#d93025">' + gr + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Flight In-Progress</div><div class="stat-value" style="color:#1e8e3e">' + ac + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Docked / Ready</div><div class="stat-value" style="color:#1a73e8">' + docked + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Charging</div><div class="stat-value" style="color:#f29900">' + chg + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Offline / Hold</div><div class="stat-value" style="color:#d93025">' + off + '</div></div>' +
     '</div>' +
-    '<div class="card"><table class="table"><thead><tr><th>Drone ID</th><th>Model</th><th>Status</th><th>Battery</th><th>Site</th><th>Turbine</th><th>Comms</th><th>Pilot</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    '<div class="card" style="margin-bottom:16px;padding:12px 16px"><div class="inline-tabs">' +
+      ['all','Flight In-Progress','Docked','Charging','Offline','attention'].map(function(f){
+        var label = f === 'all' ? 'All Visible' : f === 'attention' ? 'Needs Attention' : f;
+        return '<button class="tab-btn ' + (droneFilter===f?'active':'') + '" onclick="setDroneFilter(\'' + f + '\')">' + label + '</button>';
+      }).join('') +
+      '<span style="font-size:12px;color:#5f6368;align-self:center">' + filtered.length + ' drone' + (filtered.length!==1?'s':'') + '</span></div></div>' +
+    '<div class="card"><table class="table"><thead><tr><th>Drone ID</th><th>Model</th><th>Status</th><th>Battery</th><th>Health</th><th>Weather</th><th>Site</th><th>Turbine</th><th>Comms</th><th>Pilot</th><th>Action</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 // ── TICKETS ────────────────────────────────────────────────────────────
 function renderTickets() {
-  var filtered = tickets.filter(function(t) {
+  var scopedTickets = visibleTickets();
+  var filtered = scopedTickets.filter(function(t) {
     if (filterStatus !== 'all' && t.status !== filterStatus) return false;
     if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
     if (filterSearch) { var s = filterSearch.toLowerCase(); if (t.title.toLowerCase().indexOf(s)===-1 && t.id.toLowerCase().indexOf(s)===-1) return false; }
     return true;
   });
-  var openCt = tickets.filter(function(t){return t.status==='open';}).length;
-  var inProg = tickets.filter(function(t){return t.status==='in-progress';}).length;
-  var res    = tickets.filter(function(t){return t.status==='resolved';}).length;
+  var openCt = scopedTickets.filter(function(t){return t.status==='open';}).length;
+  var inProg = scopedTickets.filter(function(t){return t.status==='in-progress';}).length;
+  var res    = scopedTickets.filter(function(t){return t.status==='resolved';}).length;
 
   var tktHtml = filtered.length === 0
     ? '<div class="card" style="text-align:center;padding:32px;color:#5f6368">No tickets match the current filters.</div>'
@@ -525,7 +587,7 @@ function renderTickets() {
       }).join('');
 
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
-      '<div class="page-title" style="margin:0">Ticket System</div>' +
+      '<div class="page-title" style="margin:0">Maintenance Work Queue</div>' +
       '<button class="btn btn-primary" onclick="openModal(\'ticket\')">+ New Ticket</button></div>' +
     '<div class="stat-grid-3" style="margin-bottom:16px">' +
       '<div class="stat-card"><div class="stat-label">Open</div><div class="stat-value">' + openCt + '</div></div>' +
@@ -554,9 +616,11 @@ function renderTickets() {
 
 // ── SCHEDULING ─────────────────────────────────────────────────────────
 function renderSchedule() {
-  var conflicts = schedules.filter(function(s){ return s.groundCrew && s.status==='Pending'; });
+  var r = ROLES[currentRole];
+  var scopedSchedules = (currentRole === 'tech' || currentRole === 'ops' || currentRole === 'safety') ? schedules.filter(function(s){ return s.site === r.site || s.pilot === r.name; }) : schedules;
+  var conflicts = scopedSchedules.filter(function(s){ return s.groundCrew && s.status==='Pending'; });
   var banner = conflicts.length ? '<div class="interlock-warn">INTERLOCK WARNING: ' + conflicts.length + ' pending flight(s) have active ground crew on the assigned turbine. Safety Officer authorization required before dispatch can proceed.</div>' : '';
-  var rows = schedules.map(function(s) {
+  var rows = scopedSchedules.map(function(s) {
     return '<tr><td class="mono">' + s.id + '</td>' +
       '<td class="mono" style="font-size:11px">' + s.drone + '</td>' +
       '<td class="mono" style="color:#5f6368">' + s.turbine + '</td>' +
@@ -569,12 +633,12 @@ function renderSchedule() {
       '<td>' + statusBadge(s.status) + '</td></tr>';
   }).join('');
   return '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">' +
-      '<div class="page-title" style="margin:0">Flight Scheduling</div>' +
+      '<div class="page-title" style="margin:0">Flight Missions</div>' +
       '<button class="btn btn-primary" onclick="openModal(\'schedule\')">+ Schedule Flight</button></div>' +
     banner +
     '<div class="stat-grid-3" style="margin-bottom:16px">' +
-      '<div class="stat-card"><div class="stat-label">Active Today</div><div class="stat-value" style="color:#1e8e3e">' + schedules.filter(function(s){return s.status==='Active';}).length + '</div></div>' +
-      '<div class="stat-card"><div class="stat-label">Pending Auth</div><div class="stat-value" style="color:#f29900">' + schedules.filter(function(s){return s.status==='Pending';}).length + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Active Today</div><div class="stat-value" style="color:#1e8e3e">' + scopedSchedules.filter(function(s){return s.status==='Active';}).length + '</div></div>' +
+      '<div class="stat-card"><div class="stat-label">Pending Auth</div><div class="stat-value" style="color:#f29900">' + scopedSchedules.filter(function(s){return s.status==='Pending';}).length + '</div></div>' +
       '<div class="stat-card"><div class="stat-label">Interlock Conflicts</div><div class="stat-value" style="color:#d93025">' + conflicts.length + '</div></div>' +
     '</div>' +
     '<div class="card"><table class="table"><thead><tr><th>ID</th><th>Drone</th><th>Turbine</th><th>Site</th><th>Type</th><th>Pilot</th><th>Date</th><th>Auth</th><th>Interlock</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
@@ -694,28 +758,63 @@ function renderUsers() {
       '<td style="font-size:12px;color:#5f6368">' + u.lastLogin + '</td></tr>';
   }).join('');
   var noMfa = users.filter(function(u){return !u.mfa;}).length;
-  return '<div class="page-title">User Management &amp; RBAC</div>' +
+  return '<div class="page-title">Access Admin</div>' +
     '<div class="stat-grid-3" style="margin-bottom:20px">' +
       '<div class="stat-card"><div class="stat-label">Total Users</div><div class="stat-value">' + users.length + '</div></div>' +
       '<div class="stat-card"><div class="stat-label">MFA Enrolled</div><div class="stat-value" style="color:#1e8e3e">' + users.filter(function(u){return u.mfa;}).length + '</div></div>' +
       '<div class="stat-card"><div class="stat-label">MFA Not Enrolled</div><div class="stat-value" style="color:#d93025">' + noMfa + '</div>' + (noMfa>0?'<div class="stat-sub bad">Policy violation — action required</div>':'') + '</div>' +
     '</div>' +
-    '<div class="card"><div class="section-header"><span class="section-title">Personnel &amp; Access Control</span><span style="font-size:12px;color:#5f6368">Microsoft Active Directory</span></div>' +
+    '<div class="card"><div class="section-header"><span class="section-title">Personnel &amp; Role Assignments</span><span style="font-size:12px;color:#5f6368">Admin-only view &middot; Microsoft Active Directory</span></div>' +
       '<table class="table"><thead><tr><th>Employee ID</th><th>Name</th><th>Role</th><th>Job Title</th><th>Site</th><th>MFA</th><th>Status</th><th>Last Login</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 // ── MODALS ─────────────────────────────────────────────────────────────
 function renderModal() {
+  if (showModal === 'droneDetail') {
+    var d = selectedDrone();
+    var controlDisabled = ROLES[currentRole].canControl && d.status !== 'Offline' ? '' : ' disabled';
+    var securityNote = d.enc ? 'Encrypted telemetry channel is active.' : 'Telemetry channel is not encrypted. Controls are limited until security clears the aircraft.';
+    return '<div class="modal-overlay" onclick="closeModal()"><div class="modal" style="width:760px" onclick="event.stopPropagation()">' +
+      '<div class="section-header" style="margin-bottom:18px"><div><h3 style="margin-bottom:4px">' + d.short + ' - Drone Detail</h3><div class="mono" style="color:#5f6368">' + d.id + '</div></div><button class="btn" onclick="closeModal()">Close</button></div>' +
+      '<div class="camera-panel">' +
+        '<div class="camera-live">' + (d.camera === 'Online' ? 'LIVE CAMERA' : d.camera.toUpperCase()) + '</div>' +
+        '<div class="camera-target"></div>' +
+        '<div style="position:absolute;top:44px;left:18px;font-size:12px;color:#bdc1c6">Target: ' + d.turbine + '</div>' +
+        '<div class="camera-meta"><span>ALT ' + d.altitude + ' | SPD ' + d.speed + '</span><span>' + d.site + ' | ' + d.latency + ' latency</span></div>' +
+      '</div>' +
+      '<div class="detail-grid">' +
+        '<div class="detail-field"><div class="detail-label">Drone Status</div><div class="detail-value">' + statusBadge(d.status) + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Battery_Status</div><div class="detail-value">' + batBar(d.battery, 110) + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Health</div><div class="detail-value">' + statusBadge(d.health) + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Weather_Status</div><div class="detail-value">' + statusBadge(d.weather) + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Assigned Pilot</div><div class="detail-value">' + d.pilot + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Firmware</div><div class="detail-value">' + d.firmware + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Mission</div><div class="detail-value">' + d.mission + '</div></div>' +
+        '<div class="detail-field"><div class="detail-label">Communications</div><div class="detail-value">' + (d.enc ? '<span class="enc-ok">TLS 1.3 / AES-256</span>' : '<span class="enc-fail">Security Hold</span>') + '</div></div>' +
+      '</div>' +
+      '<div class="card" style="padding:12px;margin-bottom:14px"><div class="section-title" style="margin-bottom:10px">Technician Actions</div>' +
+        '<div class="control-grid">' +
+          '<button class="btn" onclick="droneAction(\'Camera viewed\', \'' + d.id + '\')">View Camera Feed</button>' +
+          '<button class="btn" onclick="droneAction(\'Diagnostics started\', \'' + d.id + '\')">Run Diagnostics</button>' +
+          '<button class="btn" onclick="droneAction(\'Return-to-dock requested\', \'' + d.id + '\')"' + controlDisabled + '>Request Return to Dock</button>' +
+          '<button class="btn" onclick="openTicketForDrone(\'' + d.id + '\')">Open Maintenance Ticket</button>' +
+          '<button class="btn" onclick="droneAction(\'Mission pause requested\', \'' + d.id + '\')"' + controlDisabled + '>Pause Mission</button>' +
+          '<button class="btn btn-danger" onclick="droneAction(\'Emergency ground command issued\', \'' + d.id + '\')"' + (currentRole === 'safety' || currentRole === 'admin' || currentRole === 'ops' ? '' : ' disabled') + '>Emergency Ground</button>' +
+        '</div>' +
+        '<div class="control-note">Role policy: technicians can view camera feeds, run diagnostics, create work orders, and request return-to-dock. Direct emergency ground commands are limited to Operations, Safety, and IT Security Admin roles. ' + securityNote + '</div>' +
+      '</div>' +
+      '</div></div>';
+  }
   if (showModal === 'ticket') {
     return '<div class="modal-overlay" onclick="closeModal()"><div class="modal" onclick="event.stopPropagation()">' +
       '<h3>New Ticket</h3>' +
       '<div class="form-row"><label class="form-label">Title</label><input class="form-input" id="nt-title" placeholder="Describe the issue" oninput="newTicket.title=this.value" value="' + newTicket.title + '" /></div>' +
       '<div class="form-row-2">' +
-        '<div><label class="form-label">Priority</label><select class="form-select" onchange="newTicket.priority=this.value"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>' +
-        '<div><label class="form-label">Category</label><select class="form-select" onchange="newTicket.category=this.value">' + ['Hardware','Software','Maintenance','Safety','Security','Compliance'].map(function(c){return '<option>'+c+'</option>';}).join('') + '</select></div>' +
+        '<div><label class="form-label">Priority</label><select class="form-select" onchange="newTicket.priority=this.value">' + ['low','medium','high','critical'].map(function(p){return '<option value="' + p + '"' + (newTicket.priority===p?' selected':'') + '>' + p.charAt(0).toUpperCase() + p.slice(1) + '</option>';}).join('') + '</select></div>' +
+        '<div><label class="form-label">Work Category</label><select class="form-select" onchange="newTicket.category=this.value">' + ['Airframe / Propulsion','Battery / Charging','Camera / Sensor Payload','Firmware / Software','Mission Safety','Cybersecurity','Regulatory Compliance','Maintenance'].map(function(c){return '<option' + (newTicket.category===c?' selected':'') + '>'+c+'</option>';}).join('') + '</select></div>' +
       '</div>' +
       '<div class="form-row-2">' +
-        '<div><label class="form-label">Site</label><select class="form-select" onchange="newTicket.site=this.value">' + ['NL-Farm-7','DE-Offshore-2','DK-Wind-1','UK-Coast-3','All Sites'].map(function(s){return '<option>'+s+'</option>';}).join('') + '</select></div>' +
+        '<div><label class="form-label">Site</label><select class="form-select" onchange="newTicket.site=this.value">' + ['NL-Farm-7','DE-Offshore-2','DK-Wind-1','UK-Coast-3','All Sites'].map(function(s){return '<option' + (newTicket.site===s?' selected':'') + '>'+s+'</option>';}).join('') + '</select></div>' +
         '<div><label class="form-label">Assignee</label><input class="form-input" placeholder="Name" oninput="newTicket.assignee=this.value" value="' + newTicket.assignee + '" /></div>' +
       '</div>' +
       '<div class="form-row"><label class="form-label">Description</label><textarea class="form-textarea" oninput="newTicket.description=this.value" placeholder="Describe the issue in detail...">' + newTicket.description + '</textarea></div>' +
@@ -768,8 +867,31 @@ function toggleTicket(id)     { expandedTicket = expandedTicket === id ? null : 
 function setFilterStatus(v)   { filterStatus = v; render(); }
 function setFilterPriority(v) { filterPriority = v; render(); }
 function setFilterSearch(v)   { filterSearch = v; render(); }
-function openModal(type)      { showModal = type; newTicket = { title:'', priority:'medium', assignee:'', site:'NL-Farm-7', category:'Hardware', description:'' }; render(); }
+function setDroneFilter(v)    { droneFilter = v; render(); }
+function openModal(type)      {
+  if (type === 'drone' && !ROLES[currentRole].canAdmin) { alert('Access denied: drone registration is restricted to IT Security Administrators.'); return; }
+  showModal = type; newTicket = { title:'', priority:'medium', assignee:'', site:ROLES[currentRole].site === 'HQ-Amsterdam' ? 'NL-Farm-7' : ROLES[currentRole].site, category:'Maintenance', description:'' }; render();
+}
+function openDroneDetail(id)  { selectedDroneId = id; showModal = 'droneDetail'; render(); }
 function closeModal()         { showModal = null; render(); }
+function droneAction(action, id) {
+  var d = drones.find(function(x){ return x.id === id; });
+  if (!d) return;
+  if (action.indexOf('Emergency') === 0 && !(currentRole === 'safety' || currentRole === 'ops' || currentRole === 'admin')) {
+    alert('Access denied: emergency ground commands require Operations, Safety, or IT Security Admin privileges.');
+    return;
+  }
+  logAudit('System', ROLES[currentRole].name, action + ': ' + id, '10.20.1.12', d.enc ? 'Low' : 'High');
+  alert(action + ' for ' + d.short + '. Event written to audit log.');
+  render();
+}
+function openTicketForDrone(id) {
+  var d = drones.find(function(x){ return x.id === id; });
+  if (!d) return;
+  showModal = 'ticket';
+  newTicket = { title:d.id + ' technician follow-up', priority:d.battery < 20 || !d.enc ? 'high' : 'medium', assignee:ROLES[currentRole].name, site:d.site, category:d.enc ? 'Maintenance' : 'Cybersecurity', description:'Follow-up from drone detail view. Health: ' + d.health + '. Battery_Status: ' + d.battery + '%. Weather_Status: ' + d.weather + '. Current mission: ' + d.mission + '.' };
+  render();
+}
 function forceLogout(i) {
   var s = sessions[i]; if (!s) return;
   logAudit('Security', ROLES[currentRole].name, 'Force logout — ' + s.user + ' session terminated', s.ip, 'Medium');
